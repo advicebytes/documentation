@@ -3,8 +3,8 @@
   "theme": "mint",
   "name": "Sector8",
   "logo": {
-    "dark": "/logo/dark.svg",
-    "light": "/logo/light.svg"
+    "dark": "/logo/sector8-logo.png",
+    "light": "/logo/sector8-logo.png"
   },
   "favicon": "/favicon.svg",
   "colors": {
