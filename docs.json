@@ -1,6 +1,7 @@
 {
-  "name": "Sector8",
+  "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
+  "name": "Sector8",
   "logo": {
     "dark": "/logo/dark.svg",
     "light": "/logo/light.svg"
@@ -11,28 +12,19 @@
     "light": "#9B5CF5",
     "dark": "#3D24C9"
   },
-  "topbarLinks": [
-    {
-      "name": "sector8.ai",
-      "url": "https://sector8.ai"
+  "navbar": {
+    "links": [
+      {
+        "label": "sector8.ai",
+        "href": "https://sector8.ai"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Book a Demo",
+      "href": "https://sector8.ai/contact"
     }
-  ],
-  "topbarCtaButton": {
-    "name": "Book a Demo",
-    "url": "https://sector8.ai/contact"
   },
-  "anchors": [
-    {
-      "name": "GitHub",
-      "icon": "github",
-      "url": "https://github.com/advicebytes"
-    },
-    {
-      "name": "LinkedIn",
-      "icon": "linkedin",
-      "url": "https://www.linkedin.com/company/sector8-ai"
-    }
-  ],
   "navigation": {
     "tabs": [
       {
@@ -92,8 +84,10 @@
       }
     ]
   },
-  "footerSocials": {
-    "linkedin": "https://www.linkedin.com/company/sector8-ai",
-    "github": "https://github.com/advicebytes"
+  "footer": {
+    "socials": {
+      "github": "https://github.com/advicebytes",
+      "linkedin": "https://www.linkedin.com/company/sector8-ai"
+    }
   }
 }
