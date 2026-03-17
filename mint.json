@@ -15,35 +15,96 @@
     }
   },
   "font": {
-    "headings": { "family": "Inter" },
-    "body": { "family": "Inter" }
+    "headings": {
+      "family": "Inter"
+    },
+    "body": {
+      "family": "Inter"
+    }
   },
   "topbarLinks": [
-    { "name": "sector8.ai", "url": "https://sector8.ai" }
+    {
+      "name": "sector8.ai",
+      "url": "https://sector8.ai"
+    }
   ],
   "topbarCtaButton": {
     "name": "Book a Demo",
     "url": "https://sector8.ai/contact"
   },
   "anchors": [
-    { "name": "GitHub", "icon": "github", "url": "https://github.com/advicebytes" },
-    { "name": "LinkedIn", "icon": "linkedin", "url": "https://www.linkedin.com/company/sector8-ai" }
+    {
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://github.com/advicebytes"
+    },
+    {
+      "name": "LinkedIn",
+      "icon": "linkedin",
+      "url": "https://www.linkedin.com/company/sector8-ai"
+    }
   ],
-  "tabs": [
-    { "name": "Guides", "url": "guides" },
-    { "name": "API Reference", "url": "api-reference" }
-  ],
-  "navigation": [
-    { "group": "Welcome", "pages": ["guides/introduction"] },
-    { "group": "Getting Started", "pages": ["guides/quickstart", "guides/onboard"] },
-    { "group": "Guard Module", "pages": ["guides/guardrails", "guides/invariants", "guides/mcp-server"] },
-    { "group": "SDK", "pages": ["guides/python-sdk", "guides/typescript-sdk"] },
-    { "group": "API Reference", "pages": ["api-reference/overview", "api-reference/health", "api-reference/evaluate", "api-reference/analyze"] },
-    { "group": "Compliance", "pages": ["guides/compliance", "guides/gdpr", "guides/hipaa"] }
-  ],
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Welcome",
+            "pages": [
+              "guides/introduction"
+            ]
+          },
+          {
+            "group": "Getting Started",
+            "pages": [
+              "guides/quickstart",
+              "guides/onboard"
+            ]
+          },
+          {
+            "group": "Guard Module",
+            "pages": [
+              "guides/guardrails",
+              "guides/invariants",
+              "guides/mcp-server"
+            ]
+          },
+          {
+            "group": "SDK",
+            "pages": [
+              "guides/python-sdk",
+              "guides/typescript-sdk"
+            ]
+          },
+          {
+            "group": "Compliance",
+            "pages": [
+              "guides/compliance",
+              "guides/gdpr",
+              "guides/hipaa"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "API Reference",
+            "pages": [
+              "api-reference/overview",
+              "api-reference/health",
+              "api-reference/evaluate",
+              "api-reference/analyze"
+            ]
+          }
+        ]
+      }
+    ]
+  },
   "footerSocials": {
     "linkedin": "https://www.linkedin.com/company/sector8-ai",
     "github": "https://github.com/advicebytes"
   }
 }
-
