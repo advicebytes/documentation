@@ -1,8 +1,9 @@
 {
   "name": "Sector8",
+  "theme": "mint",
   "logo": {
-    "dark": "/logo/sector8-dark.svg",
-    "light": "/logo/sector8-light.svg"
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
   },
   "favicon": "/favicon.svg",
   "colors": {
@@ -12,14 +13,6 @@
     "background": {
       "dark": "#08080F",
       "light": "#FAFAFF"
-    }
-  },
-  "font": {
-    "headings": {
-      "family": "Inter"
-    },
-    "body": {
-      "family": "Inter"
     }
   },
   "topbarLinks": [
