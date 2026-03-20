@@ -1,28 +1,45 @@
 ---
 title: Guard MCP Server
-description: Govern Claude Code tool calls automatically — no code changes required
+description: Govern Claude Code and MCP-compatible agent tool calls with fail-closed enforcement and forensic telemetry.
 ---
 
 ## What it does
 
-The Guard MCP Server intercepts every Claude Code tool call — bash, file read/write, web fetch — before OS execution. It routes each call through the Sector8 Admission Controller and either permits or blocks it.
+The Guard MCP Server intercepts Claude Code tool calls before OS execution. It governs
+`bash`, `read_file`, `write_file`, and `web_fetch` by routing each call through the
+Sector8 Admission Controller.
 
-Zero changes to your agent or prompts. One config file. Full forensic telemetry on every call.
+This is not a separate policy path. The MCP server uses the same guard engine, invariants,
+evidence hashing, and telemetry model as the rest of the Guard Module.
 
 ## Installation
+
+Primary path after installing the SDK:
+
+```bash
+pip install sector8-sdk
+```
+
+Then run:
 
 ```bash
 sector8-guard install
 ```
 
-This writes to `.claude/settings.json` in your project root:
+This writes `.claude/settings.json` for the current project and preserves existing
+settings keys.
+
+The installer writes a relative command entry that targets the checked-in MCP server
+launcher from the repo root. On Windows it prefers the `.cmd` wrapper when present.
+
+Manual fallback:
 
 ```json
 {
   "mcpServers": {
     "sector8-guard": {
-      "command": "sector8-guard-mcp",
-      "args": ["--policy", "enterprise-v1"],
+      "command": "python",
+      "args": ["sector8-backend/scripts/mcp_stdio_server.py"],
       "env": {
         "SECTOR8_API_KEY": "${SECTOR8_API_KEY}",
         "SECTOR8_CLIENT_ID": "${SECTOR8_CLIENT_ID}"
@@ -32,81 +49,179 @@ This writes to `.claude/settings.json` in your project root:
 }
 ```
 
+On Windows, replace the args path with the `.cmd` wrapper if present:
+
+```json
+{
+  "mcpServers": {
+    "sector8-guard": {
+      "command": "scripts/run_sector8_guard_mcp.cmd",
+      "args": []
+    }
+  }
+}
+```
+
 ## How it works
 
-```
+```text
 Claude Code tool call
-        │
-        ▼ (JSON-RPC via MCP protocol)
+        |
+        v
 Guard MCP Server
-        │
-        ▼
-Admission Controller   ← same policy engine, same 7 invariants
-        │
-   DENY │ ALLOW
-        │
-     Blocks  │  Executes
-     with    │  tool and
-     trace   │  returns result
+        |
+        v
+Admission Controller
+  |- pre-filter
+  |- rate and multi-turn checks
+  |- tool registration and capability checks
+  |- BOLA and BFLA checks
+  |- semantic and segmented-input checks
+  |- request-risk checks
+        |
+   +----+----+
+   |         |
+   v         v
+ DENY      ALLOW
+   |         |
+   |         +-- tool executes
+   +-- tool never executes
 ```
 
-The Guard MCP Server is the same Admission Controller used by the REST API — not a separate system. Policy, telemetry, and forensic records are unified.
+The Guard MCP Server uses the same Admission Controller as the REST API. Policy,
+telemetry, and forensic records are unified across both paths.
+
+## Security guarantees
+
+### Fail-closed on guard exception
+
+If any unhandled exception occurs in the evaluation path, the decision is `DENY`. The tool
+does not execute.
+
+Returned denial:
+
+- `reason_code: GUARD_INTERNAL_ERROR`
+- non-empty `evidence_hash`
+- `has_forensic_payload: true`
+- `decision_trace_id`
+- `policy_version_id`
+
+There is no fail-open path.
+
+### Forensic completeness on deny
+
+Every denied MCP response includes:
+
+- `decision`
+- `reason_code`
+- `evidence_hash`
+- `has_forensic_payload`
+- `decision_trace_id`
+- `policy_version_id`
+
+This is enforced by the deny invariant in CI.
+
+### Authorization is enforced, not advisory
+
+The admission path enforces:
+
+- tool registration
+- capability checks
+- object-level authorization (BOLA)
+- function-level authorization (BFLA)
+- semantic threat scoring
+- segmented-input safety
+- request-risk checks such as SSRF and sensitive path access
+- admission rate limiting
 
 ## Governed tools
 
 | Tool | What gets checked |
-|------|-------------------|
-| `bash` | Command for shell injection, destructive operations |
-| `read_file` | Path for sensitive file access (`/etc/passwd`, credentials) |
-| `write_file` | Path and content for injection payloads, PII |
-| `web_fetch` | URL against domain allowlist, exfiltration patterns |
+| --- | --- |
+| `bash` | shell injection, destructive commands, obfuscated command payloads, rate limiting |
+| `read_file` | sensitive paths, object ownership, authorization |
+| `write_file` | content safety, authorization, object scoping |
+| `web_fetch` | SSRF, private IP ranges, localhost, DNS resolution to private targets, unsupported schemes, URL credentials, external domain policy |
 
-## Example — blocked call
+## `web_fetch` protections
+
+`web_fetch` is not guarded by a simple hostname allowlist.
+
+The current request-risk path blocks:
+
+- raw private IP targets
+- loopback and localhost
+- link-local targets such as `169.254.169.254`
+- DNS results that resolve to private IP space
+- unsupported URL schemes
+- URL credentials
+- non-allowlisted external domains
+
+This is designed to stop common SSRF paths, including cloud metadata access.
+
+## Example - blocked call
 
 ```json
 {
   "decision": "DENY",
   "tool_name": "bash",
-  "reason_code": "SHELL_INJECTION_BLOCKED",
-  "evidence_hash": "bdbde1558fb883573b0f6e8630...",
+  "reason_code": "MCP_SHELL_INJECTION_BLOCKED",
+  "evidence_hash": "bdbde1558fb883573b0f6e8630ccba1edaf6bed8cb035fa6a48912809149f287",
   "has_forensic_payload": true,
-  "decision_trace_id": "32819155-d21a-49c8-9509-79338d980fa9"
+  "decision_trace_id": "32819155-d21a-49c8-9509-79338d980fa9",
+  "policy_version_id": "0dbca364d66447469637bafa2282e635124fcb99eecd6383038e3b652577ebc7"
 }
 ```
 
-## Example — allowed call
+## Example - allowed call
 
 ```json
 {
   "decision": "ALLOW",
   "tool_name": "bash",
-  "reason_code": null,
-  "pre_filter_decision": "PASS",
-  "semantic_score": 0.08,
-  "decision_trace_id": "17e797c0-eb5c-4f97-b4a1-2d3e4f5a6b7c"
+  "evidence_hash": "4cb7f786d1f3b57e6f98f3e60d2eb6b81c402d6d3efeb6c9551049f7c14df2f0",
+  "has_forensic_payload": false,
+  "decision_trace_id": "17e797c0-eb5c-4f97-b4a1-2d3e4f5a6b7c",
+  "result": {
+    "stdout": "hello",
+    "stderr": "",
+    "exit_code": 0
+  }
 }
 ```
 
 ## Verify the connection
 
-After installation, open Claude Code in your project and run:
+Inside Claude Code:
 
-```
+```text
 /mcp
 ```
 
-You should see `sector8-guard` listed as a connected server.
+You should see `sector8-guard` as a connected server.
 
-To test it is working, ask Claude Code to run a blocked command:
+Then test one allow and one deny:
 
+```text
+Use the sector8-guard MCP server to run bash: echo hello
+Use the sector8-guard MCP server to run bash: rm -rf /
 ```
-Run: rm -rf /
-```
 
-The Guard MCP Server will intercept and deny the call before anything executes.
+Expected:
+
+- `echo hello` -> `ALLOW`
+- `rm -rf /` -> `DENY`
 
 ## Fleet deployment
 
-For teams, distribute `.claude/settings.json` via your repo. Every engineer with the file gets governed tool calls automatically — no individual setup required.
+Distribute `.claude/settings.json` through the repo or developer environment management.
+Each engineer then gets governed tool execution with the same denial schema and forensic
+model.
 
-Per-engineer telemetry is recorded separately, identifiable by `user_id` in the telemetry records.
+## Non-MCP agents
+
+MCP-compatible agents are covered natively. Non-MCP tool callers, including containerized
+Codex CLI integrations, use the SDK adapter and `POST /api/v1/evaluate`.
+
+See the [non-MCP integration guide](/guides/non-mcp-integration) for the container
+pattern, required environment variables, and enforcement examples.

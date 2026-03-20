@@ -48,7 +48,8 @@
             "pages": [
               "guides/guardrails",
               "guides/invariants",
-              "guides/mcp-server"
+              "guides/mcp-server",
+              "guides/non-mcp-integration"
             ]
           },
           {

@@ -1,0 +1,125 @@
+---
+title: Non-MCP integration
+description: Put Sector8 into a containerized Codex CLI or other non-MCP tool caller with one evaluation endpoint.
+---
+
+## What this page covers
+
+This guide explains how to add Sector8 to a containerized coding-agent deployment that
+does not speak MCP natively. The supported path is the SDK adapter plus
+`POST /api/v1/evaluate`.
+
+## Container pattern
+
+Add Sector8 to the approved Codex CLI base image once:
+
+```dockerfile
+FROM your-registry/codex-cli-base:latest
+
+RUN pip install sector8-sdk
+
+COPY sector8_policy.yaml /etc/sector8/policy.yaml
+
+ENV SECTOR8_API_URL=https://sdkapi.sector8.ai
+```
+
+Do not bake secrets into the image. Inject them at runtime.
+
+## Required environment variables
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `SECTOR8_API_URL` | yes | Sector8 API base URL |
+| `SECTOR8_API_KEY` | yes | tenant API key for `POST /api/v1/evaluate` |
+| `SECTOR8_CLIENT_ID` | yes | tenant or client identifier |
+| `CODEX_USER_ID` | yes | developer identity recorded in telemetry |
+| `CODEX_ROLE` | yes | authorization role, for example `developer` |
+| `CODEX_SESSION_ID` | yes | per-session trace and rate-limit identity |
+
+## Wrapper pattern
+
+Replace direct tool dispatch with the Sector8 adapter:
+
+```python
+from sdk.adapters.openai_tools_adapter import OpenAIToolsAdapter, ToolBlockedError
+import os
+
+adapter = OpenAIToolsAdapter(
+    api_url=os.environ["SECTOR8_API_URL"],
+    api_key=os.environ["SECTOR8_API_KEY"],
+    client_id=os.environ["SECTOR8_CLIENT_ID"],
+    caller_id=os.environ["CODEX_USER_ID"],
+    role=os.environ.get("CODEX_ROLE", "developer"),
+    session_id=os.environ["CODEX_SESSION_ID"],
+)
+```
+
+Then route every tool call through `adapter.execute(...)` before local dispatch.
+
+## Response schema
+
+The evaluation endpoint returns:
+
+```json
+{
+  "decision": "ALLOW|DENY",
+  "reason_code": null,
+  "evidence_hash": "64-char-hash",
+  "has_forensic_payload": false,
+  "decision_trace_id": "uuid",
+  "policy_version_id": "string"
+}
+```
+
+On deny, `reason_code` is populated and `has_forensic_payload` is `true`.
+
+## Example - blocked call
+
+```json
+{
+  "decision": "DENY",
+  "reason_code": "PRIVATE_IP_BLOCKED",
+  "evidence_hash": "bdbde1558fb883573b0f6e8630ccba1edaf6bed8cb035fa6a48912809149f287",
+  "has_forensic_payload": true,
+  "decision_trace_id": "32819155-d21a-49c8-9509-79338d980fa9",
+  "policy_version_id": "0dbca364d66447469637bafa2282e635124fcb99eecd6383038e3b652577ebc7"
+}
+```
+
+## Example - allowed call
+
+```json
+{
+  "decision": "ALLOW",
+  "reason_code": null,
+  "evidence_hash": "4cb7f786d1f3b57e6f98f3e60d2eb6b81c402d6d3efeb6c9551049f7c14df2f0",
+  "has_forensic_payload": false,
+  "decision_trace_id": "74dc8812-2cd7-4c0d-bfcb-98438a57fcb3",
+  "policy_version_id": "0dbca364d66447469637bafa2282e635124fcb99eecd6383038e3b652577ebc7"
+}
+```
+
+## What developers see
+
+Allowed calls execute locally after an `ALLOW` decision. Denied calls do not execute. The
+developer receives a denial with `reason_code`, `evidence_hash`, `decision_trace_id`, and
+`policy_version_id`.
+
+## Observability
+
+The same decision path powers Stage 2 observability. Each call can be tied to:
+
+- caller identity
+- session identity
+- decision outcome
+- reason code
+- evidence hash
+- policy version
+- decision trace ID
+
+That is what makes the control auditable rather than advisory.
+
+## Honest scope
+
+This path governs tool calls that route through the adapter. It does not govern inline
+completions or chat content that never becomes a governed tool call.

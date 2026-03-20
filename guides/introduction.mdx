@@ -17,13 +17,13 @@ Monitor, protect, and govern your AI applications in real-time. Turn AI black bo
 
 <CardGroup cols={2}>
   <Card title="Block threats in real time" icon="shield-halved">
-    Stop prompt injection, shell injection, PII exfiltration, and data leakage before they execute. 314/314 threats blocked. 100% forensic coverage.
+    Stop prompt injection, shell injection, PII exfiltration, and data leakage before they execute. Denied calls carry forensic fields for audit and replay.
   </Card>
   <Card title="Govern Claude Code" icon="plug">
     The Guard MCP Server intercepts every Claude Code tool call — bash, file access, web fetch — before OS execution. One config file, zero code changes.
   </Card>
   <Card title="Full audit trail" icon="file-lines">
-    Every blocked call produces a tamper-evident record with a signed evidence hash, policy version, and decision trace ID. Built for GDPR, HIPAA, and PCI-DSS.
+    Every blocked call produces a tamper-evident record with an evidence hash, policy version, and decision trace ID. Built for GDPR, HIPAA, and PCI-DSS.
   </Card>
   <Card title="Drop into existing apps" icon="code">
     Wire the Guard Module into any LLM application via the Python SDK or REST API. Works with any model, any agent framework.
@@ -43,7 +43,7 @@ LLM Output
 Spotlighting          ← trust-tags all content by source
     │
     ▼
-Pre-Filter            ← fast path: <5ms, blocks obvious threats
+Pre-Filter            ← low-latency fast path, blocks obvious threats
     │
     ▼
 Admission Controller  ← 5-check policy gate, 7 invariants enforced
