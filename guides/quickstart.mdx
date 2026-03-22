@@ -3,15 +3,124 @@ title: Quickstart
 description: Get Sector8 running in under 10 minutes
 ---
 
-<Info>Full quickstart guide coming soon. In the meantime, see the [Python SDK](/guides/python-sdk) or [Guard MCP Server](/guides/mcp-server) guides to get started.</Info>
+## Choose your integration path
 
-## Choose your path
+There are two ways to use the Sector8 Guard Module:
 
-<CardGroup cols={2}>
-  <Card title="Python SDK" icon="python" href="/guides/python-sdk">
-    Wire the Guard Module into an existing LLM application
+| Path | Best for |
+|------|----------|
+| [Guard MCP Server](#path-a-guard-mcp-server) | Governing Claude Code tool calls -- no code changes |
+| [REST API / SDK](#path-b-rest-api--sdk) | Any LLM application that dispatches tool calls programmatically |
+
+---
+
+## Path A -- Guard MCP Server
+
+Govern every Claude Code `bash`, `read_file`, `write_file`, and `web_fetch` call with one
+config change.
+
+**Step 1** -- Install the SDK:
+
+```bash
+pip install sector8-sdk
+```
+
+**Step 2** -- Run the installer:
+
+```bash
+sector8-guard install
+```
+
+This writes `.claude/settings.json` for the current project and preserves any existing
+settings keys.
+
+**Step 3** -- Set your credentials:
+
+```bash
+export SECTOR8_API_KEY=your-api-key
+export SECTOR8_CLIENT_ID=your-client-id
+```
+
+**Step 4** -- Verify the connection inside Claude Code:
+
+```text
+/mcp
+```
+
+You should see `sector8-guard` listed as a connected server. Test with:
+
+```text
+Use the sector8-guard MCP server to run bash: echo hello
+Use the sector8-guard MCP server to run bash: rm -rf /
+```
+
+Expected: `echo hello` -> `ALLOW`, `rm -rf /` -> `DENY`.
+
+See the [Guard MCP Server guide](/guides/mcp-server) for full configuration options.
+
+---
+
+## Path B -- REST API / SDK
+
+Evaluate any tool call against the active policy before dispatching it.
+
+**Step 1** -- Install the SDK:
+
+```bash
+pip install sector8-sdk
+```
+
+**Step 2** -- Make your first evaluation call:
+
+```python
+import httpx
+
+response = httpx.post(
+    "https://sdkapi.sector8.ai/api/v1/evaluate",
+    headers={
+        "x-api-key": "YOUR_API_KEY",
+        "x-client-id": "YOUR_CLIENT_ID",
+    },
+    json={
+        "tool_name": "bash",
+        "arguments": {"command": "cat /etc/passwd"},
+        "caller_id": "engineer-42",
+        "role": "developer",
+        "session_id": "session-abc123",
+    },
+)
+
+result = response.json()
+if result["decision"] == "ALLOW":
+    # dispatch the tool call
+    pass
+else:
+    print(f"Blocked: {result['reason_code']}")
+    print(f"Evidence hash: {result['evidence_hash']}")
+```
+
+**Step 3** -- Check the health endpoint to confirm the Guard Module is live:
+
+```bash
+curl https://sdkapi.sector8.ai/api/health
+```
+
+Expected response includes `"invariants_active": 7` and all capabilities `true`.
+
+See the [API reference](/api-reference/evaluate) for the full request and response schema.
+
+---
+
+## Next steps
+
+<CardGroup cols={3}>
+  <Card title="Guardrails" icon="shield" href="/guides/guardrails">
+    Understand what each admission check does and what gets blocked
   </Card>
   <Card title="Guard MCP Server" icon="plug" href="/guides/mcp-server">
-    Govern Claude Code tool calls with one config file
+    Full MCP Server configuration -- fleet deployment, Windows setup, verification
+  </Card>
+  <Card title="Non-MCP integration" icon="code" href="/guides/non-mcp-integration">
+    Container pattern for Codex CLI and other non-MCP tool callers
   </Card>
 </CardGroup>

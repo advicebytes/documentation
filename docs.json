@@ -31,38 +31,28 @@
         "tab": "Guides",
         "groups": [
           {
-            "group": "Welcome",
+            "group": "Start here",
             "pages": [
-              "guides/introduction"
+              "guides/introduction",
+              "guides/quickstart"
             ]
           },
           {
-            "group": "Getting Started",
+            "group": "Integration paths",
             "pages": [
-              "guides/quickstart",
-              "guides/onboard"
-            ]
-          },
-          {
-            "group": "Guard Module",
-            "pages": [
-              "guides/guardrails",
-              "guides/invariants",
               "guides/mcp-server",
-              "guides/non-mcp-integration"
-            ]
-          },
-          {
-            "group": "SDK",
-            "pages": [
+              "guides/non-mcp-integration",
               "guides/python-sdk",
               "guides/typescript-sdk"
             ]
           },
           {
-            "group": "Compliance",
+            "group": "Security and compliance",
             "pages": [
+              "guides/guardrails",
+              "guides/invariants",
               "guides/compliance",
+              "guides/eu-ai-act",
               "guides/gdpr",
               "guides/hipaa"
             ]

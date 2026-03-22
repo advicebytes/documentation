@@ -3,27 +3,31 @@ title: HIPAA
 description: How Sector8 enforces HIPAA controls for PHI protection in AI applications
 ---
 
-<Info>Full HIPAA compliance guide coming soon. See the [Compliance Overview](/guides/compliance) for a summary of all framework coverage.</Info>
+Sector8 enforces HIPAA controls **before data moves** - at the tool call boundary, before the OS executes the request. Set `COMPLIANCE_LEVEL=HIPAA` to activate PHI pattern matching at admission check 6 (ComplianceGate).
 
 ## Controls enforced at tool boundary
 
 | HIPAA Requirement | How Sector8 enforces it |
 |------------------|------------------------|
-| §164.312(a) — Access control | Tool allowlist + RBAC enforced at admission check 3 |
-| §164.312(b) — Audit controls | Tamper-evident audit trail on every tool call, ALLOW and DENY |
-| §164.312(c) — Integrity | HMAC-SHA256 signed policy bundles prevent policy tampering |
-| §164.312(e) — Transmission security | Blocks data transmission to unlisted external domains |
-| Minimum necessary standard | Pre-filter blocks requests exceeding defined data access scope |
+| 164.312(a) - Access control | Tool allowlist + RBAC enforced at admission check 3 |
+| 164.312(b) - Audit controls | Tamper-evident audit trail on every tool call, ALLOW and DENY |
+| 164.312(c) - Integrity | HMAC-SHA256 signed policy bundles prevent policy tampering |
+| 164.312(e) - Transmission security | Blocks data transmission to unlisted external domains |
+| Minimum necessary standard | ComplianceGate (AC-6) blocks tool calls whose payload contains PHI patterns, preventing access beyond what the request requires |
 
 ## PHI detection
 
-Sector8 detects and blocks access to or transmission of:
-- Medical record numbers (MRN)
-- Diagnosis codes (ICD-10)
-- Patient names combined with medical context
-- Insurance member IDs
-- Prescription details
-- Clinical notes containing patient identifiers
+ComplianceGate (AC-6) uses regex-based pattern matching to detect PHI. The shipped HIPAA pack detects:
+
+| Pattern | What it matches |
+|---------|----------------|
+| `mrn` | Medical record numbers - `MRN:` prefix followed by 7-10 digits |
+| `npi` | National Provider Identifiers - `NPI:` followed by 10 digits |
+| `icd10` | ICD-10 diagnosis codes - standard code format |
+| `insurance_id` | Member ID, insurance ID, or policy ID fields |
+| `dea_number` | DEA registration numbers - two letters followed by 7 digits |
+
+Detection is pattern-based, not semantic. Clinical notes or narrative text that do not contain these structured identifiers are not matched by the HIPAA pack. The GDPR PII patterns (email, phone, SSN, and others) also apply when `COMPLIANCE_LEVEL=HIPAA`.
 
 ## Audit record format
 

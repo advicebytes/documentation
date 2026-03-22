@@ -6,7 +6,7 @@ description: REST API for the Sector8 Guard Module
 ## Base URL
 
 ```
-https://api.sector8.ai/v1
+https://sdkapi.sector8.ai
 ```
 
 ## Authentication
@@ -14,39 +14,43 @@ https://api.sector8.ai/v1
 All requests require two headers:
 
 ```http
-Authorization: Bearer YOUR_API_KEY
-X-Client-ID: YOUR_CLIENT_ID
+x-api-key: YOUR_API_KEY
+x-client-id: YOUR_CLIENT_ID
 ```
 
-Get your API key from the [Sector8 dashboard](https://sector8.ai).
+Get your API key and client ID from the [Sector8 dashboard](https://app.sector8.ai).
 
 ## Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | [`/health`](/api-reference/health) | Guard Module health and capability state |
-| `POST` | [`/evaluate`](/api-reference/evaluate) | Evaluate a tool call against active policy |
-| `POST` | [`/analyze`](/api-reference/analyze) | Analyze a completed LLM interaction |
+| `GET` | [`/api/health`](/api-reference/health) | Guard Module health and capability state |
+| `POST` | [`/api/v1/evaluate`](/api-reference/evaluate) | Evaluate a tool call against active policy |
+| `POST` | [`/api/v1/telemetry`](/api-reference/analyze) | Ingest a completed LLM interaction for analysis |
 
 ## Reason codes
 
-| Code | Threat | Severity |
-|------|--------|----------|
-| `SHELL_INJECTION_BLOCKED` | Shell injection | Critical |
-| `SENSITIVE_PATH_BLOCKED` | Sensitive file access | High |
-| `PII_EXPOSURE_BLOCKED` | PII / PHI in payload | Medium–High |
-| `DATA_EXFILTRATION_BLOCKED` | External data transmission | Critical |
-| `PROMPT_INJECTION_BLOCKED` | Instruction override attempt | High |
-| `SEMANTIC_THREAT_DETECTED` | Semantic similarity to known attack | High |
-| `ESCALATION_SCORE_EXCEEDED` | Multi-turn session escalation | High |
-| `PRE_FILTER_BLOCK` | Fast-path pattern match | Critical |
-| `LOCKDOWN_MODE_RESTRICTED` | Capability gate | Medium |
-| `SOFT_COMPLIANCE_VIOLATION` | Output compliance — refusal bypass | Medium |
+| Code | Trigger |
+|------|---------|
+| `MCP_SHELL_INJECTION_BLOCKED` | Shell injection detected in command |
+| `SENSITIVE_PATH_BLOCKED` | Access to a sensitive file path |
+| `MCP_OBFUSCATED_*_BLOCKED` | Obfuscated payload decoded and blocked (e.g. `MCP_OBFUSCATED_SHELL_INJECTION_BLOCKED`) |
+| `PARAM_INJECTION_DETECTED` | Prompt or parameter injection in arguments |
+| `SEMANTIC_THREAT_DETECTED` | Semantic similarity to known attack pattern |
+| `PRIVATE_IP_BLOCKED` | SSRF - target resolves to private IP space |
+| `EXTERNAL_DOMAIN_BLOCKED` | Domain not on the allowed list |
+| `BOLA_VIOLATION` | Caller does not own the target object |
+| `BFLA_VIOLATION` | Caller role is not authorized for this tool |
+| `GDPR_DATA_MINIMISATION_VIOLATION` | PII detected - data minimisation policy |
+| `HIPAA_MINIMUM_NECESSARY_VIOLATION` | PHI detected - minimum necessary standard |
+| `RATE_LIMIT_EXCEEDED` | Call rate exceeded for this session |
+| `TOOL_NOT_REGISTERED` | Tool has not been registered with the Guard Module |
+| `LOCKDOWN_RESTRICTED` | Tool is disabled by lockdown capability gate |
+| `CAPABILITY_MISSING` | Required capability is not available |
+| `GUARD_INTERNAL_ERROR` | Unhandled exception - fail-closed, tool not executed |
 
 ## Rate limits
 
-| Tier | Requests/min | Burst |
-|------|-------------|-------|
-| Free | 60 | 100 |
-| Pro | 600 | 1,000 |
-| Enterprise | Unlimited | Custom |
+The shipped app and MCP server enforce per-session, per-tool rate limiting via an in-memory sliding window. The current injected runtime limit is **8 requests per 10 seconds** per session and tool combination. The limiter implementation's class default is 25 requests per 10 seconds. Requests over the limit return `RATE_LIMIT_EXCEEDED`.
+
+Contact support to adjust limits for your deployment.

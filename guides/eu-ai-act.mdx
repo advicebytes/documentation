@@ -1,0 +1,54 @@
+---
+title: EU AI Act
+description: How Sector8 covers the EU AI Act requirements enforced at the LLM tool execution boundary
+---
+
+Sector8 enforces EU AI Act obligations **at the execution boundary** -- before any tool call reaches the OS.
+The coverage score is computed from live enforcement data, not a self-assessment checklist.
+
+## Article coverage
+
+| Article | Requirement | How Sector8 covers it |
+|---------|-------------|----------------------|
+| **Art. 9** | Risk management system | Fail-closed Admission Controller with 7 CI-verified invariants. Any unhandled exception produces a `DENY` -- the system cannot fail open. |
+| **Art. 10** | Data governance | ComplianceGate (AC-6) scans every tool call for PII/PHI before execution. Data never moves until a policy decision is made. |
+| **Art. 12** | Logging and record-keeping | Every decision -- ALLOW and DENY -- produces a tamper-evident record with `evidence_hash`, `policy_version_id`, and `decision_trace_id`. |
+| **Art. 13** | Transparency | Policy version metadata is embedded in every telemetry row. Coverage accumulates as historical rows build up. |
+| **Art. 14** | Human oversight | The review queue routes borderline decisions to a human reviewer before execution. Unanswered items are auto-denied (fail-closed). |
+
+<Info>
+Art. 13 coverage depends on policy-version metadata accumulating in telemetry over time. A fresh deployment will show it as not yet covered until enough rows exist -- this is correct behaviour, not a gap.
+</Info>
+
+## Readiness score
+
+The EU AI Act score is available on the compliance dashboard (`app.sector8.ai/c/compliance`) and via the API:
+
+```bash
+curl -s "https://sdkapi.sector8.ai/api/v1/compliance/summary" \
+  -H "x-client-id: $CLIENT_ID" \
+  -H "x-api-key: $API_KEY" | python -m json.tool
+```
+
+```json
+{
+  "eu_ai_act_score": 80,
+  "eu_ai_act_articles": {
+    "ART_9":  { "covered": true,  "label": "Risk management" },
+    "ART_10": { "covered": true,  "label": "Data governance" },
+    "ART_12": { "covered": true,  "label": "Logging" },
+    "ART_13": { "covered": false, "label": "Transparency" },
+    "ART_14": { "covered": true,  "label": "Human oversight" }
+  }
+}
+```
+
+`covered: false` on Art. 13 means not enough historical telemetry rows yet -- not a violation.
+
+## What this means in practice
+
+- **Art. 9** is covered because the codebase has a fail-closed risk management system with CI-verified invariants -- not because someone ticked a box.
+- **Art. 12** is covered because every decision produces a forensic log with an evidence hash -- verifiable at audit time.
+- **Art. 14** is covered because the review queue routes flagged calls to a human before execution.
+
+These are code facts. They can be verified by reading the source.

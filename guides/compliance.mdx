@@ -1,9 +1,9 @@
 ---
 title: Compliance Overview
-description: How Sector8 enforces GDPR, HIPAA, PCI-DSS, ISO 27001, and SOC 2 at the tool execution boundary
+description: How Sector8 enforces GDPR, HIPAA, EU AI Act, PCI-DSS, ISO 27001, and SOC 2 at the tool execution boundary
 ---
 
-Sector8 enforces compliance controls **before data moves** — at the tool call boundary, not in post-execution audit logs.
+Sector8 enforces compliance controls **before data moves** -- at the tool call boundary, not in post-execution audit logs.
 
 ## The pre-execution advantage
 
@@ -13,6 +13,7 @@ Traditional compliance tools operate after the fact. Sector8 intercepts before t
 |-----------|----------------------|
 | [GDPR](/guides/gdpr) | PII detection, data minimisation, Art. 5/17 audit trail |
 | [HIPAA](/guides/hipaa) | PHI patterns, minimum-necessary access, §164.312 logging |
+| [EU AI Act](/guides/eu-ai-act) | Risk management (Art. 9), data governance (Art. 10), logging (Art. 12), transparency (Art. 13), human oversight (Art. 14) |
 | PCI-DSS v4 | PAN/CVV detection, CDE path blocking, Req. 10.2 + 6.3.2 |
 | ISO 27001 | A.8.2, A.9.4, A.12.4, A.14.2 |
 | SOC 2 Type II | CC6.1, CC6.6, CC7.2, CC9.2 |
@@ -30,8 +31,8 @@ Every blocked call produces a tamper-evident record:
 }
 ```
 
-- `evidence_hash` — SHA-256 of the blocked payload. Tamper-evident.
-- `policy_version` — HMAC-SHA256 signed bundle. Proves which policy made the decision.
-- `decision_trace_id` — Links the denial to the full admission trace.
+- `evidence_hash` -- SHA-256 of the blocked payload. Tamper-evident.
+- `policy_version` -- HMAC-SHA256 signed bundle. Proves which policy made the decision.
+- `decision_trace_id` -- Links the denial to the full admission trace.
 
 See [Guardrails](/guides/guardrails#forensic-telemetry) for the full telemetry reference.

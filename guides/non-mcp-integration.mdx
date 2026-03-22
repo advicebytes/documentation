@@ -1,17 +1,24 @@
 ---
 title: Non-MCP integration
-description: Put Sector8 into a containerized Codex CLI or other non-MCP tool caller with one evaluation endpoint.
+description: Add Sector8 enforcement to a containerized Codex CLI or other non-MCP tool caller with one evaluation endpoint.
 ---
 
-## What this page covers
+Non-MCP tool callers -- including containerized Codex CLI deployments -- use
+`POST /api/v1/evaluate` as their enforcement gate. Every tool call passes through
+the same Admission Controller that governs the MCP Server. The container pattern
+requires no code changes to the base image.
 
-This guide explains how to add Sector8 to a containerized coding-agent deployment that
-does not speak MCP natively. The supported path is the SDK adapter plus
-`POST /api/v1/evaluate`.
+## Prerequisites
 
-## Container pattern
+- A Sector8 API key and client ID (from the [Sector8 dashboard](https://app.sector8.ai))
+- A container build that you control
+- `pip` available in the container
 
-Add Sector8 to the approved Codex CLI base image once:
+---
+
+## Step 1 -- Add Sector8 to the container image
+
+Install the SDK once in your approved base image:
 
 ```dockerfile
 FROM your-registry/codex-cli-base:latest
@@ -23,9 +30,9 @@ COPY sector8_policy.yaml /etc/sector8/policy.yaml
 ENV SECTOR8_API_URL=https://sdkapi.sector8.ai
 ```
 
-Do not bake secrets into the image. Inject them at runtime.
+Do not bake credentials into the image. Inject them at runtime via the environment.
 
-## Required environment variables
+## Step 2 -- Set required environment variables
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
@@ -36,9 +43,10 @@ Do not bake secrets into the image. Inject them at runtime.
 | `CODEX_ROLE` | yes | authorization role, for example `developer` |
 | `CODEX_SESSION_ID` | yes | per-session trace and rate-limit identity |
 
-## Wrapper pattern
+## Step 3 -- Route tool calls through the adapter
 
-Replace direct tool dispatch with the Sector8 adapter:
+Replace direct tool dispatch with the Sector8 adapter. The adapter calls
+`POST /api/v1/evaluate` and raises `ToolBlockedError` on `DENY`:
 
 ```python
 from sdk.adapters.openai_tools_adapter import OpenAIToolsAdapter, ToolBlockedError
@@ -54,26 +62,43 @@ adapter = OpenAIToolsAdapter(
 )
 ```
 
-Then route every tool call through `adapter.execute(...)` before local dispatch.
+Route every tool call through `adapter.execute(...)` before local dispatch:
 
-## Response schema
+```python
+try:
+    result = adapter.execute(tool_name="bash", arguments={"command": cmd})
+    # dispatch locally
+except ToolBlockedError as e:
+    print(f"Blocked: {e.reason_code}")
+    print(f"Evidence hash: {e.evidence_hash}")
+    print(f"Trace ID: {e.decision_trace_id}")
+```
 
-The evaluation endpoint returns:
+## Success state
+
+When correctly wired:
+
+- Allowed calls execute locally after an `ALLOW` decision.
+- Denied calls raise `ToolBlockedError` and never reach the OS.
+- Every call -- ALLOW and DENY -- appears in your Sector8 telemetry.
+- DENY decisions trigger the alert dispatcher if a webhook or SNS ARN is configured.
+
+## Evaluation response schema
 
 ```json
 {
   "decision": "ALLOW|DENY",
   "reason_code": null,
-  "evidence_hash": "64-char-hash",
+  "evidence_hash": "",
   "has_forensic_payload": false,
   "decision_trace_id": "uuid",
   "policy_version_id": "string"
 }
 ```
 
-On deny, `reason_code` is populated and `has_forensic_payload` is `true`.
+On `DENY`, `reason_code` is populated and `has_forensic_payload` is `true`.
 
-## Example - blocked call
+## Example -- blocked call
 
 ```json
 {
@@ -86,38 +111,24 @@ On deny, `reason_code` is populated and `has_forensic_payload` is `true`.
 }
 ```
 
-## Example - allowed call
+## Example -- allowed call
 
 ```json
 {
   "decision": "ALLOW",
   "reason_code": null,
-  "evidence_hash": "4cb7f786d1f3b57e6f98f3e60d2eb6b81c402d6d3efeb6c9551049f7c14df2f0",
+  "evidence_hash": "",
   "has_forensic_payload": false,
   "decision_trace_id": "74dc8812-2cd7-4c0d-bfcb-98438a57fcb3",
   "policy_version_id": "0dbca364d66447469637bafa2282e635124fcb99eecd6383038e3b652577ebc7"
 }
 ```
 
-## What developers see
+## Gotchas
 
-Allowed calls execute locally after an `ALLOW` decision. Denied calls do not execute. The
-developer receives a denial with `reason_code`, `evidence_hash`, `decision_trace_id`, and
-`policy_version_id`.
-
-## Observability
-
-The same decision path powers Stage 2 observability. Each call can be tied to:
-
-- caller identity
-- session identity
-- decision outcome
-- reason code
-- evidence hash
-- policy version
-- decision trace ID
-
-That is what makes the control auditable rather than advisory.
+- **`session_id` is required for rate limiting.** A missing or static `session_id` will cause all requests to share a rate limit bucket.
+- **`owned_objects` must list what the caller actually owns.** BOLA checks compare `object_id` against this list -- an empty list means every object-level request is denied.
+- **Do not cache `ALLOW` decisions.** The Admission Controller evaluates every call independently. A cached `ALLOW` is not a security property.
 
 ## Honest scope
 

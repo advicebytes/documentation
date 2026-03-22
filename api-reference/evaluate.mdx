@@ -1,15 +1,15 @@
 ---
-title: POST /evaluate
-description: Evaluate a tool call against the active policy. Returns an admission decision.
+title: POST /api/v1/evaluate
+description: Evaluate a tool call against the active policy. Returns an admission decision with forensic fields.
 ---
 
 ## Request
 
 ```http
-POST /evaluate HTTP/1.1
-Host: api.sector8.ai
-Authorization: Bearer YOUR_API_KEY
-X-Client-ID: YOUR_CLIENT_ID
+POST /api/v1/evaluate HTTP/1.1
+Host: sdkapi.sector8.ai
+x-api-key: YOUR_API_KEY
+x-client-id: YOUR_CLIENT_ID
 Content-Type: application/json
 ```
 
@@ -19,12 +19,12 @@ Content-Type: application/json
   "arguments": {
     "command": "cat /etc/passwd"
   },
+  "caller_id": "engineer-42",
+  "role": "developer",
   "session_id": "session-abc123",
-  "user_id": "engineer-42",
-  "context": {
-    "source": "claude_code",
-    "project": "backend"
-  }
+  "owned_objects": ["repo-frontend"],
+  "object_id": "repo-frontend",
+  "operation": "read"
 }
 ```
 
@@ -32,41 +32,39 @@ Content-Type: application/json
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `tool_name` | ✓ | Tool being called: `bash`, `read_file`, `write_file`, `web_fetch`, or custom registered tools |
-| `arguments` | ✓ | Tool arguments as a JSON object |
-| `session_id` | ✓ | Stable session identifier — required for multi-turn escalation scoring |
-| `user_id` | | Engineer or agent identifier for per-user telemetry |
-| `context` | | Additional metadata included in the telemetry record |
+| `tool_name` | yes | Tool being called - must match a registered tool name |
+| `arguments` | yes | Tool arguments as a JSON object |
+| `caller_id` | no | Engineer or agent identifier - recorded in telemetry |
+| `role` | no | Authorization role - checked against the tool's `required_role` |
+| `session_id` | no | Stable session identifier - required for rate limiting and multi-turn analysis |
+| `owned_objects` | no | List of object IDs the caller owns - used for BOLA checks |
+| `object_id` | no | Target object for this call - checked against `owned_objects` |
+| `operation` | no | Requested operation - used in policy evaluation |
+| `capability` | no | Explicit capability override - defaults to `tool_name` |
 
-## Response — ALLOW
+## Response - ALLOW
 
 ```json
 {
   "decision": "ALLOW",
   "reason_code": null,
-  "pre_filter_decision": "PASS",
-  "semantic_score": 0.08,
-  "semantic_cluster": null,
-  "policy_version_id": "0dbca364d66447469637bafa2282e635124fcb99eecd6383038e3b652577ebc7",
+  "evidence_hash": "4cb7f786d1f3b57e6f98f3e60d2eb6b81c402d6d3efeb6c9551049f7c14df2f0",
+  "has_forensic_payload": false,
   "decision_trace_id": "17e797c0-eb5c-4f97-b4a1-2d3e4f5a6b7c",
-  "evidence_hash": null,
-  "has_forensic_payload": false
+  "policy_version_id": "0dbca364d66447469637bafa2282e635124fcb99eecd6383038e3b652577ebc7"
 }
 ```
 
-## Response — DENY
+## Response - DENY
 
 ```json
 {
   "decision": "DENY",
   "reason_code": "SENSITIVE_PATH_BLOCKED",
-  "pre_filter_decision": "BLOCK",
-  "semantic_score": 0.94,
-  "semantic_cluster": "pii_exfiltration",
-  "policy_version_id": "0dbca364d66447469637bafa2282e635124fcb99eecd6383038e3b652577ebc7",
-  "decision_trace_id": "32819155-d21a-49c8-9509-79338d980fa9",
   "evidence_hash": "bdbde1558fb883573b0f6e8630ccba1edaf6bed8cb035fa6a48912809149f287",
-  "has_forensic_payload": true
+  "has_forensic_payload": true,
+  "decision_trace_id": "32819155-d21a-49c8-9509-79338d980fa9",
+  "policy_version_id": "0dbca364d66447469637bafa2282e635124fcb99eecd6383038e3b652577ebc7"
 }
 ```
 
@@ -75,15 +73,18 @@ Content-Type: application/json
 | Field | Type | Description |
 |-------|------|-------------|
 | `decision` | string | `"ALLOW"` or `"DENY"` |
-| `reason_code` | string\|null | Machine-readable denial reason. See [reason codes](/api-reference/overview#reason-codes). |
-| `pre_filter_decision` | string | `"BLOCK"`, `"PASS"`, or `"REVIEW"` |
-| `semantic_score` | number | 0.0–1.0 semantic threat similarity score |
-| `semantic_cluster` | string\|null | Nearest threat cluster when score is significant |
-| `policy_version_id` | string | Signed policy bundle hash — links decision to policy state |
-| `decision_trace_id` | string | UUID — links to full admission trace in telemetry |
-| `evidence_hash` | string\|null | SHA-256 of blocked payload. Present on all DENY records. |
-| `has_forensic_payload` | boolean | `true` on 100% of DENY records |
+| `reason_code` | string\|null | Machine-readable denial reason. Null on ALLOW. See [reason codes](/api-reference/overview#reason-codes). |
+| `evidence_hash` | string | SHA-256 evidence hash for the decision payload. Always present. Forensically significant on DENY. |
+| `has_forensic_payload` | boolean | `true` on all DENY records, `false` on ALLOW |
+| `decision_trace_id` | string | UUID - links this decision to the full admission trace |
+| `policy_version_id` | string\|null | HMAC-SHA256 signed policy bundle hash - proves which policy version made the decision |
 
 <Note>
-`evidence_hash` is a cryptographic hash of the blocked payload. It can be used to verify the contents of a denial record have not been tampered with after the fact.
+Every DENY carries `evidence_hash` and `has_forensic_payload: true`. This is enforced by CI across the entire deny surface - there is no deny path that omits these fields.
 </Note>
+
+## Telemetry and alert dispatch
+
+Every call through `/api/v1/evaluate` is recorded. DENY decisions trigger the alert dispatcher: a webhook or SNS notification is sent to the configured security endpoint if `SECTOR8_ALERT_WEBHOOK_URL` or `SECTOR8_ALERT_SNS_TOPIC` is set.
+
+See [Guardrails](/guides/guardrails#forensic-telemetry) for the full telemetry reference.
