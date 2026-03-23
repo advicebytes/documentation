@@ -1,4 +1,4 @@
-{
+﻿{
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "Sector8",
@@ -34,7 +34,8 @@
             "group": "Start here",
             "pages": [
               "guides/introduction",
-              "guides/quickstart"
+              "guides/quickstart",
+              "guides/onboard"
             ]
           },
           {

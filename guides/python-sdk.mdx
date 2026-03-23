@@ -1,147 +1,134 @@
 ---
 title: Python SDK
-description: Wire the Sector8 Guard Module into your LLM application in minutes
+description: Install the Python SDK, send a real event to production, and confirm the integration worked.
 ---
 
-## Installation
+Use this path when your application runs on Python and you want the fastest production onboarding flow.
+
+## Prerequisites
+
+- Python 3.10 or later
+- `SECTOR8_API_KEY`
+- `SECTOR8_CLIENT_ID`
+
+## Install the SDK
 
 ```bash
 pip install sector8-sdk
 ```
 
-Requires Python 3.10+.
-
-## Authentication
+## Set your credentials
 
 ```bash
-export SECTOR8_API_KEY=your_api_key_here
+export SECTOR8_API_KEY=your_api_key
 export SECTOR8_CLIENT_ID=your_client_id
 ```
 
-Or pass directly:
-
-```python
-from sector8 import GuardClient
-
-client = GuardClient(
-    api_key="your_api_key_here",
-    client_id="your_client_id",
-)
-```
-
-## Evaluate a tool call
-
-```python
-from sector8 import GuardClient, ToolCallRequest
-
-client = GuardClient()
-
-result = client.evaluate(
-    ToolCallRequest(
-        tool_name="bash",
-        arguments={"command": "ls -la /home"},
-        session_id="session-abc123",
-        user_id="engineer-42",
-    )
-)
-
-if result.decision == "ALLOW":
-    output = execute_bash(result.request.arguments["command"])
-else:
-    print(f"Blocked: {result.reason_code}")
-    print(f"Evidence hash: {result.evidence_hash}")
-    print(f"Trace ID: {result.decision_trace_id}")
-```
-
-## Drop-in wrapper for existing agents
-
-Replace your existing tool dispatch with this single function:
-
-```python
-from sector8 import GuardClient, ToolCallRequest
-from sector8.exceptions import AdmissionDeniedError
-
-client = GuardClient()
-
-def guarded_tool_call(tool_name: str, arguments: dict, session_id: str):
-    result = client.evaluate(
-        ToolCallRequest(
-            tool_name=tool_name,
-            arguments=arguments,
-            session_id=session_id,
-        )
-    )
-
-    if result.decision == "DENY":
-        raise AdmissionDeniedError(
-            reason=result.reason_code,
-            evidence_hash=result.evidence_hash,
-            trace_id=result.decision_trace_id,
-        )
-
-    return dispatch_tool(tool_name, arguments)
-```
-
-## Multi-turn session protection
-
-Pass a consistent `session_id` across turns to enable escalation scoring. After repeated denied turns in a session, subsequent calls are blocked even if per-turn content looks benign.
-
-```python
-SESSION_ID = "session-abc123"
-
-for turn in conversation:
-    result = client.evaluate(
-        ToolCallRequest(
-            tool_name=turn.tool,
-            arguments=turn.args,
-            session_id=SESSION_ID,  # same ID every turn
-        )
-    )
-```
-
-## Admission decision object
-
-```python
-@dataclass
-class AdmissionDecision:
-    decision:             str          # "ALLOW" | "DENY"
-    reason_code:          str | None   # e.g. "SHELL_INJECTION_BLOCKED"
-    evidence_hash:        str | None   # SHA-256 of blocked payload
-    has_forensic_payload: bool         # True on all DENY records
-    policy_version_id:    str          # HMAC-SHA256 signed bundle hash
-    decision_trace_id:    str          # Full trace linkage UUID
-    semantic_score:       float | None # 0.0–1.0 if semantic engine ran
-    pre_filter_decision:  str | None   # "BLOCK" | "PASS" | "REVIEW"
-```
-
-## Error handling
-
-```python
-from sector8.exceptions import (
-    AdmissionDeniedError,
-    PolicyVersionMismatchError,
-    GuardClientError,
-)
-
-try:
-    result = client.evaluate(request)
-except AdmissionDeniedError as e:
-    # Blocked — safe to log and continue
-    logger.warning(f"Blocked: {e.reason} | trace: {e.trace_id}")
-except PolicyVersionMismatchError:
-    # Policy bundle changed — re-fetch before retrying
-    client.refresh_policy()
-except GuardClientError as e:
-    # Network or config error — fail closed
-    raise
-```
-
-## Claude Code — MCP integration
-
-For teams using Claude Code, install the Guard MCP Server instead. Every tool call is governed automatically with no code changes.
+## Send your first event
 
 ```bash
-sector8-guard install
+python - <<'PY'
+import asyncio
+import os
+import sector8
+
+async def main():
+    client = sector8.setup(
+        api_key=os.environ["SECTOR8_API_KEY"],
+        client_id=os.environ["SECTOR8_CLIENT_ID"],
+        debug=True,
+    )
+    result = await client.save_telemetry(
+        provider="openai",
+        model="gpt-4",
+        prompt="Sector8 Python SDK onboarding test",
+        completion="Telemetry sent successfully",
+        tokens_used=24,
+        latency_ms=120,
+        cost=0.001,
+        success=True,
+        metadata={"source": "python-sdk-onboard"},
+    )
+    print(result["status"])
+    await client.close()
+
+asyncio.run(main())
+PY
 ```
 
-See the [Guard MCP Server guide](/guides/mcp-server) for full setup instructions.
+Expected output:
+
+```text
+success
+```
+
+<Tip>
+The Python SDK defaults to the production Guard Module at `https://sdkapi.sector8.ai`. Override `base_url` only for staging or custom environments.
+</Tip>
+
+## Use the three-line setup
+
+```python
+import sector8
+
+client = sector8.setup(
+    api_key="your_api_key",
+    client_id="your_client_id",
+)
+
+client.log_llm_call("openai", "gpt-4", tokens=150, cost=0.003)
+```
+
+## Use the async API directly
+
+```python
+import asyncio
+import sector8
+
+async def main():
+    client = sector8.setup(
+        api_key="your_api_key",
+        client_id="your_client_id",
+    )
+    await client.save_telemetry(
+        provider="openai",
+        model="gpt-4",
+        prompt="hello",
+        completion="world",
+        tokens_used=10,
+        latency_ms=80,
+        cost=0.001,
+        success=True,
+    )
+    await client.close()
+
+asyncio.run(main())
+```
+
+## Verify the integration
+
+1. Check production health:
+
+```bash
+curl https://sdkapi.sector8.ai/api/health
+```
+
+2. Confirm your script returned `success`
+3. Confirm the event appears in Sector8 telemetry or the dashboard
+
+<Check>
+You are done when your Python script returns `success` and you can see the event in Sector8.
+</Check>
+
+## Common mistakes
+
+- Missing `SECTOR8_CLIENT_ID`
+- Forgetting to `await client.save_telemetry(...)`
+- Overriding `base_url` to an older host
+
+## Next steps
+
+- [Onboarding](/guides/onboard)
+- [Quickstart](/guides/quickstart)
+- [Non-MCP integration](/guides/non-mcp-integration)
+- [Guard MCP Server](/guides/mcp-server)

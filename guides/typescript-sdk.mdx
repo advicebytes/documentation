@@ -1,54 +1,120 @@
 ---
 title: TypeScript SDK
-description: Wire the Sector8 Guard Module into your Node.js or TypeScript application
+description: Install the TypeScript SDK, verify connectivity to production, and log your first event.
 ---
 
-<Info>The TypeScript SDK is in active development. For early access contact [support@sector8.ai](mailto:support@sector8.ai). In the meantime, use the [REST API](/api-reference/overview) directly.</Info>
+Use this path when your application runs on Node.js or TypeScript and you want a direct SDK integration instead of calling the REST API yourself.
 
-## Coming soon
+## Prerequisites
+
+- Node.js 18 or later
+- `SECTOR8_API_KEY`
+- `SECTOR8_CLIENT_ID`
+
+## Install the SDK
 
 ```bash
 npm install @sector8/sdk
 ```
 
+## Set your credentials
+
+```bash
+export SECTOR8_API_KEY=your_api_key
+export SECTOR8_CLIENT_ID=your_client_id
+```
+
+## Send your first event
+
 ```typescript
-import { GuardClient, ToolCallRequest } from '@sector8/sdk';
+import sector8 from '@sector8/sdk';
 
-const client = new GuardClient({
-  apiKey: process.env.SECTOR8_API_KEY,
-  clientId: process.env.SECTOR8_CLIENT_ID,
-});
+async function main() {
+  const client = sector8.setup({
+    apiKey: process.env.SECTOR8_API_KEY!,
+    clientId: process.env.SECTOR8_CLIENT_ID ?? '1',
+    enableAutoInstrumentation: false,
+    debug: true,
+  });
 
-const result = await client.evaluate({
-  toolName: 'bash',
-  arguments: { command: 'ls -la' },
-  sessionId: 'session-abc123',
-});
+  const connected = await client.testConnection();
+  console.log('Connected:', connected);
 
-if (result.decision === 'DENY') {
-  console.log('Blocked:', result.reasonCode);
-  console.log('Evidence hash:', result.evidenceHash);
+  await client.logLLMCall({
+    provider: 'openai',
+    model: 'gpt-4',
+    tokens: 24,
+    cost: 0.001,
+    latency_ms: 120,
+    success: true,
+    prompt: 'Sector8 TypeScript SDK onboarding test',
+    completion: 'Telemetry sent successfully',
+  });
+
+  await client.close();
 }
+
+main().catch(console.error);
 ```
 
-## Use the REST API now
+Expected output:
 
-While the SDK is in development, you can use the [REST API](/api-reference/overview) directly from any Node.js application:
+```text
+Connected: true
+```
+
+<Tip>
+The TypeScript SDK defaults to the production Guard Module at `https://sdkapi.sector8.ai`. You only need `baseUrl` when targeting a non-production environment.
+</Tip>
+
+## Minimal setup
 
 ```typescript
-const response = await fetch('https://api.sector8.ai/v1/evaluate', {
-  method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${process.env.SECTOR8_API_KEY}`,
-    'X-Client-ID': process.env.SECTOR8_CLIENT_ID,
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    tool_name: 'bash',
-    arguments: { command: 'ls -la' },
-    session_id: 'session-abc123',
-  }),
+import sector8 from '@sector8/sdk';
+
+const client = sector8.setup({
+  apiKey: process.env.SECTOR8_API_KEY!,
+  clientId: process.env.SECTOR8_CLIENT_ID ?? '1',
 });
 
-const decision = await response.json();
+await client.logLLMCall({
+  provider: 'openai',
+  model: 'gpt-4',
+  tokens: 150,
+  cost: 0.003,
+});
 ```
+
+## Verify the integration
+
+1. Run:
+
+```bash
+curl https://sdkapi.sector8.ai/api/health
+```
+
+2. Confirm `client.testConnection()` returns `true`
+3. Confirm the event appears in Sector8 telemetry or the dashboard
+
+<Check>
+You are done when `testConnection()` returns `true` and one `logLLMCall()` event is visible in Sector8.
+</Check>
+
+## Use the REST API instead
+
+If you want pre-execution tool enforcement instead of SDK telemetry, route tool calls through:
+
+- [Non-MCP integration](/guides/non-mcp-integration)
+- [API reference](/api-reference/evaluate)
+
+## Common mistakes
+
+- Using the wrong host instead of `https://sdkapi.sector8.ai`
+- Forgetting `SECTOR8_CLIENT_ID`
+- assuming `testConnection()` proves logging works without sending a real event
+
+## Next steps
+
+- [Onboarding](/guides/onboard)
+- [Quickstart](/guides/quickstart)
+- [API reference](/api-reference/overview)

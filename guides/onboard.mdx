@@ -1,18 +1,88 @@
 ---
 title: Onboarding
-description: Connect your AI application to Sector8
+description: Get a new Sector8 customer from API keys to a verified first event in under 10 minutes.
 ---
 
-<Info>Full onboarding guide coming soon. Contact [support@sector8.ai](mailto:support@sector8.ai) to get your API key and client ID.</Info>
+Connect your application to Sector8, send one real event to production, and confirm the integration worked before you write more code.
 
-## What you'll need
+## What you need
 
-- A Sector8 API key and client ID — [book a demo](https://sector8.ai/contact) to get access
-- Python 3.10+ or Node.js 18+ for the SDK
-- Your existing LLM application or Claude Code setup
+- A Sector8 API key
+- A Sector8 client ID
+- Python 3.10+ or Node.js 18+
+- Access to the application that will send tool calls or telemetry
+
+<Info>
+Contact [support@sector8.ai](mailto:support@sector8.ai) or [book a demo](https://sector8.ai/contact) if you still need your API key and client ID.
+</Info>
+
+## Choose your path
+
+<CardGroup cols={3}>
+  <Card title="Python SDK" icon="python" href="/guides/python-sdk">
+    Best when your app already runs on Python and you want the shortest path to a working integration.
+  </Card>
+  <Card title="TypeScript SDK" icon="code" href="/guides/typescript-sdk">
+    Best for Node.js or TypeScript services that need telemetry and security events without changing providers.
+  </Card>
+  <Card title="REST API" icon="terminal" href="/guides/non-mcp-integration">
+    Best when you want to route tool calls through Sector8 directly with `POST /api/v1/evaluate`.
+  </Card>
+</CardGroup>
+
+## Recommended first run
+
+<Steps>
+  <Step title="Set your credentials">
+    Add your credentials to the environment:
+
+    ```bash
+    export SECTOR8_API_KEY=your_api_key
+    export SECTOR8_CLIENT_ID=your_client_id
+    ```
+  </Step>
+
+  <Step title="Pick one verified production path">
+    Use one of these guides:
+
+    - [Python SDK](/guides/python-sdk)
+    - [TypeScript SDK](/guides/typescript-sdk)
+    - [Non-MCP integration](/guides/non-mcp-integration)
+  </Step>
+
+  <Step title="Send one real event">
+    Your first successful run should do one of these:
+
+    - call `client.log_llm_call(...)` or `client.logLLMCall(...)`
+    - call `POST /api/v1/evaluate`
+    - run one governed MCP tool call
+  </Step>
+
+  <Step title="Verify the result">
+    Confirm:
+
+    - the request succeeded
+    - the production health endpoint responds at `https://sdkapi.sector8.ai/api/health`
+    - the event appears in your Sector8 dashboard or telemetry backend
+  </Step>
+</Steps>
+
+<Check>
+You are done when one real call succeeds against `https://sdkapi.sector8.ai` and you can trace that call in Sector8 using its returned metadata.
+</Check>
+
+## Common mistakes
+
+<Warning>
+Use `https://sdkapi.sector8.ai` for production. Older `api.sector8.ai` references are not the current FastAPI Guard Module.
+</Warning>
+
+- Set both `SECTOR8_API_KEY` and `SECTOR8_CLIENT_ID`
+- Do not hardcode credentials in source control
+- For governed tool execution, pass a stable `session_id`
 
 ## Next steps
 
-1. [Get the Python SDK](/guides/python-sdk)
-2. [Set up the Guard MCP Server](/guides/mcp-server)
-3. [Review the API reference](/api-reference/overview)
+- [Quickstart](/guides/quickstart)
+- [Guard MCP Server](/guides/mcp-server)
+- [API reference](/api-reference/overview)
